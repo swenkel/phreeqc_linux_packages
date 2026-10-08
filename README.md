@@ -44,15 +44,16 @@ openSUSE Leap 16.1 is still a release candidate, so 15.6 is the previous Leap re
 
 ## What the package contains
 
-The package follows upstream `make install --prefix=/usr`:
+The package follows upstream `make install --prefix=/usr`, then moves the databases and examples out of `/usr/share/doc`. Ubuntu and Debian omit that documentation tree when a package is installed, which would leave the examples directory empty.
 
 - `/usr/bin/phreeqc`
-- databases, examples, and documentation under `/usr/share/doc/phreeqc`
+- databases and examples under `/usr/share/phreeqc`
+- manuals and the user-rights notice under `/usr/share/doc/phreeqc`
 
 The default database name inside the program is `phreeqc.dat` in the working directory, or the path in `PHREEQC_DATABASE`. Example 1 can be run with the installed database explicitly:
 
 ```bash
-phreeqc /usr/share/doc/phreeqc/examples/ex1 ex1.out /usr/share/doc/phreeqc/database/phreeqc.dat
+phreeqc /usr/share/phreeqc/examples/ex1 ex1.out /usr/share/phreeqc/database/phreeqc.dat
 ```
 
 PHREEQC is public-domain software from the U.S. Geological Survey.

@@ -15,6 +15,7 @@ set -euo pipefail
 SPEC=/opt/phreeqc-build/phreeqc.spec
 CACHE_TARBALL=/cache/${PHREEQC_TARBALL}
 DOC_ROOT=/usr/share/doc/phreeqc
+SHARE_ROOT=/usr/share/phreeqc
 
 die() {
   printf 'error: %s\n' "$1" >&2
@@ -42,16 +43,23 @@ install_deps() {
   esac
 }
 
+relocate_runtime_files() {
+  local staging=$1
+  mkdir -p "${staging}${SHARE_ROOT}"
+  mv "${staging}${DOC_ROOT}/database" "${staging}${SHARE_ROOT}/database"
+  mv "${staging}${DOC_ROOT}/examples" "${staging}${SHARE_ROOT}/examples"
+}
+
 assert_install_layout() {
   local staging=$1
   [[ -f "${staging}/usr/bin/phreeqc" ]] || die "make install did not produce /usr/bin/phreeqc"
-  [[ -f "${staging}${DOC_ROOT}/database/phreeqc.dat" ]] || die "make install did not produce phreeqc.dat"
-  [[ -f "${staging}${DOC_ROOT}/examples/ex1" ]] || die "make install did not produce examples/ex1"
+  [[ -f "${staging}${SHARE_ROOT}/database/phreeqc.dat" ]] || die "make install did not produce phreeqc.dat"
+  [[ -f "${staging}${SHARE_ROOT}/examples/ex1" ]] || die "make install did not produce examples/ex1"
 
   local unexpected
   unexpected=$(find "$staging" -type f -o -type l | sed "s|^${staging}||" | while read -r path; do
     case "$path" in
-      /usr/bin/phreeqc|"${DOC_ROOT}"|"${DOC_ROOT}"/*) ;;
+      /usr/bin/phreeqc|"${DOC_ROOT}"|"${DOC_ROOT}"/*|"${SHARE_ROOT}"|"${SHARE_ROOT}"/*) ;;
       *) printf '%s\n' "$path" ;;
     esac
   done)
@@ -131,15 +139,7 @@ install_package() {
   package=${packages[0]}
   case "$PKG_FORMAT" in
     deb)
-      # Official Debian and Ubuntu images exclude /usr/share/doc so the
-      # rootfs stays small. A normal system installs those files. Include
-      # this package's documentation tree so the smoke test sees the
-      # databases upstream installs there.
-      dpkg -i \
-        --path-include="/usr/share/doc/phreeqc/*" \
-        --path-include="/usr/share/doc/phreeqc/*/*" \
-        --path-include="/usr/share/doc/phreeqc/*/*/*" \
-        "$package"
+      dpkg -i "$package"
       ;;
     rpm)
       rpm -Uvh --nosignature "$package"
@@ -153,10 +153,10 @@ install_package() {
 smoke_test() {
   local smoke db
   smoke=$(mktemp -d)
-  db=${DOC_ROOT}/database/phreeqc.dat
+  db=${SHARE_ROOT}/database/phreeqc.dat
   command -v phreeqc >/dev/null 2>&1 || die "phreeqc is not on PATH after install"
   [[ -s "$db" ]] || die "installed database is missing: ${db}"
-  cp "${DOC_ROOT}/examples/ex1" "${smoke}/ex1"
+  cp "${SHARE_ROOT}/examples/ex1" "${smoke}/ex1"
   phreeqc "${smoke}/ex1" "${smoke}/ex1.out" "$db"
   [[ -s "${smoke}/ex1.out" ]] || die "example 1 produced no output"
   printf 'Smoke test passed (example 1).\n'
@@ -196,6 +196,7 @@ main() {
     make install "DESTDIR=${staging}"
   )
   staging="${work}/staging"
+  relocate_runtime_files "$staging"
   assert_install_layout "$staging"
 
   find /output -mindepth 1 -maxdepth 1 -exec rm -rf {} +
